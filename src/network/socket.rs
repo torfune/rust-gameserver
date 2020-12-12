@@ -29,7 +29,7 @@ pub async fn connection(
 
   // Send initial data
   if let Some(sender) = &client.sender {
-    let _ = sender.send(Ok(Message::text(format!("id|{}", client.player_id))));
+    let _ = sender.send(Ok(Message::text(format!("id/{}", client.player_id))));
   }
 
   while let Some(result) = client_ws_receiver.next().await {

@@ -63,7 +63,7 @@ async fn main() {
   );
 
   thread::spawn(move || {
-    let game_loop = GameLoop::new(10, 1).unwrap();
+    let game_loop = GameLoop::new(20, 1).unwrap();
 
     loop {
       for action in game_loop.actions() {

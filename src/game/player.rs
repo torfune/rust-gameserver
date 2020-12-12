@@ -23,7 +23,7 @@ impl Player {
       return;
     };
 
-    let payload: Vec<&str> = payload.split("|").collect();
+    let payload: Vec<&str> = payload.split(";").collect();
     if payload.len() != 2 {
       println!("Bad payload");
       return;
