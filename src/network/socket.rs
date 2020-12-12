@@ -1,13 +1,13 @@
-use crate::{Client, Clients, Room};
+use crate::{Client, Clients, Messages};
 use futures::{FutureExt, StreamExt};
 use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
 
 pub async fn connection(
   ws: WebSocket,
-  id: String,
+  client_id: String,
   clients: Clients,
-  room: Room,
+  messages: Messages,
   mut client: Client,
 ) {
   let (client_ws_sender, mut client_ws_receiver) = ws.split();
@@ -20,55 +20,39 @@ pub async fn connection(
   }));
 
   client.sender = Some(client_sender);
-  clients.write().await.insert(id.clone(), client.clone());
+  clients
+    .write()
+    .await
+    .insert(client_id.clone(), client.clone());
 
   println!("Client connected");
 
-  // Send initial room state
+  // Send initial data
   if let Some(sender) = &client.sender {
-    let _ = sender.send(Ok(Message::text(room.to_datastring().await)));
+    let _ = sender.send(Ok(Message::text(format!("id|{}", client.player_id))));
   }
 
-  // Handle messages until closed
   while let Some(result) = client_ws_receiver.next().await {
-    let msg = match result {
-      Ok(msg) => msg,
+    let message = match result {
+      Ok(message) => message,
       Err(e) => {
         eprintln!("Error receiving websocket message: {}", e);
         break;
       }
     };
 
-    handle_message(&id, msg, &clients, &room).await;
+    let mut client_messages = match messages.write().await.get_mut(&client_id) {
+      Some(client_messages) => client_messages.clone(),
+      None => Vec::new(),
+    };
+
+    client_messages.push(message);
+    messages
+      .write()
+      .await
+      .insert(client_id.clone(), client_messages);
   }
 
-  clients.write().await.remove(&id);
+  clients.write().await.remove(&client_id);
   println!("Client disconnected");
-}
-
-async fn handle_message(id: &str, msg: Message, clients: &Clients, room: &Room) {
-  let message = match std::str::from_utf8(msg.as_bytes()) {
-    Ok(value) => value,
-    Err(_) => return,
-  };
-
-  let message: Vec<&str> = message.split("|").collect();
-  if message.len() != 2 {
-    println!("Bad message");
-    return;
-  }
-
-  let message_name = message[0];
-  let message_payload = message[1];
-
-  println!("Message Name: {}", message_name);
-  println!("Message Payload: {}", message_payload);
-
-  if let Some(client) = clients.read().await.get(id).cloned() {
-    let mut locked = room.players.write().await;
-
-    if let Some(player) = locked.get_mut(&client.player_id) {
-      player.handle_message(message_name, message_payload)
-    }
-  }
 }

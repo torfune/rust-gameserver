@@ -1,7 +1,7 @@
 use super::socket;
 use super::Client;
 use crate::Player;
-use crate::{Clients, Result, Room};
+use crate::{Clients, Messages, Result, Room};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp::{http::StatusCode, reply::json, Reply};
@@ -32,15 +32,11 @@ pub async fn handle_register(
   };
 
   clients.write().await.insert(client_id.clone(), client);
-  room.players.write().await.insert(
-    player_id.clone(),
-    Player {
-      id: player_id,
-      client_id: client_id.clone(),
-      name: String::from("Test Player"),
-      position: (0, 0),
-    },
-  );
+  room
+    .players
+    .write()
+    .await
+    .insert(player_id.clone(), Player::new(player_id, client_id.clone()));
 
   return Ok(json(&RegisterResponse {
     url: format!("ws://127.0.0.1:8000/ws/{}", client_id),
@@ -56,11 +52,13 @@ pub async fn handle_websocket(
   ws: warp::ws::Ws,
   id: String,
   clients: Clients,
-  room: Room,
+  messages: Messages,
 ) -> Result<impl Reply> {
   let client = clients.read().await.get(&id).cloned();
   return match client {
-    Some(c) => Ok(ws.on_upgrade(move |socket| socket::connection(socket, id, clients, room, c))),
+    Some(c) => {
+      Ok(ws.on_upgrade(move |socket| socket::connection(socket, id, clients, messages, c)))
+    }
     None => Err(warp::reject::not_found()),
   };
 }
