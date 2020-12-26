@@ -13,6 +13,7 @@ use warp::{Filter, Rejection};
 
 mod game;
 mod network;
+mod utils;
 
 type Result<T> = std::result::Result<T, Rejection>;
 pub type Clients = Arc<RwLock<HashMap<String, Client>>>;
